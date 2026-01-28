@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Simulator</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <script>
+      // Pure-JS chart manager. PyScript sends JSON strings only (no PyProxy objects).
+      window.TradingCharts = (() => {
+        let equityChart = null;
+        let cashChart = null;
+
+        function formatCurrency(value) {
+          // Chart.js tick callback signature: (value, index, ticks)
+          return '$' + Number(value).toFixed(2);
+        }
+
+        function init() {
+          if (equityChart && cashChart) return;
+
+          const equityCtx = document.getElementById('equityChart').getContext('2d');
+          equityChart = new Chart(equityCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Price', data: [], borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: false, ticks: { callback: formatCurrency } },
+                x: { display: false }
+              }
+            }
+          });
+
+          const cashCtx = document.getElementById('cashChart').getContext('2d');
+          cashChart = new Chart(cashCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Total Equity Value', data: [], borderColor: '#27ae60', backgroundColor: 'rgba(39, 174, 96, 0.1)', borderWidth: 2, fill: true, tension: 0.4 }] },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: false, ticks: { callback: formatCurrency } },
+                x: { display: false }
+              }
+            }
+          });
+        }
+
+        function destroy() {
+          if (equityChart) { equityChart.destroy(); equityChart = null; }
+          if (cashChart) { cashChart.destroy(); cashChart = null; }
+        }
+
+        // payloadJson = {"equity":{"labels":[...],"data":[...]}, "cash":{"labels":[...],"data":[...]}}
+        function updateFromJson(payloadJson) {
+          init();
+          const payload = JSON.parse(payloadJson);
+          if (payload.equity) {
+            equityChart.data.labels = payload.equity.labels || [];
+            equityChart.data.datasets[0].data = payload.equity.data || [];
+            equityChart.update('none');
+          }
+          if (payload.cash) {
+            cashChart.data.labels = payload.cash.labels || [];
+            cashChart.data.datasets[0].data = payload.cash.data || [];
+            cashChart.update('none');
+          }
+        }
+
+        return { init, destroy, updateFromJson };
+      })();
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Instructions Screen -->
+        <div id="instructionsScreen" class="screen">
+            <h1>Trading Simulator</h1>
+            <div class="instructions-panel">
+                <h2>How to Play</h2>
+                <p style="margin-bottom: 15px; font-size: 1.05em; line-height: 1.6;">
+                    You were given $10,000 on a margin loan and your goal is to 10x the money. Good luck!
+                </p>
+                <ul>
+                    <li><strong>Goal:</strong> Make your Total Equity reach $100,000 to win!</li>
+                    <li>Choose an equity from the dropdown (5 options available)</li>
+                    <li>Watch its price chart update in real-time</li>
+                    <li>Enter quantity and click Buy or Sell</li>
+                    <li>Your "Total Equity" is your net value (portfolio value) and your Score is Total Equity minus Starting Total Equity</li>
+                    <li>The total value of positions you own can only equal your Total Equity - you must sell positions to buy more</li>
+                    <li>You can always buy back shorted stocks (stocks with negative positions)</li>
+                    <li>If your Total Equity ever hits 0 you lose</li>
+                </ul>
+            </div>
+            <button id="startButton" class="start-button">Start</button>
+        </div>
+
+        <!-- Trading Screen -->
+        <div id="tradingScreen" class="screen hidden">
+            <div class="header-stats">
+                <div class="stat">
+                    <span class="stat-label">Total Equity:</span>
+                    <span id="cashDisplay" class="stat-value">$10,000.00</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Score:</span>
+                    <span id="scoreDisplay" class="stat-value">$0.00</span>
+                </div>
+            </div>
+
+            <div class="portfolio-section-top">
+                <h3>Portfolio</h3>
+                <div class="portfolio-header">
+                    <span class="portfolio-header-label">Name</span>
+                    <span class="portfolio-header-label">Qty</span>
+                    <span class="portfolio-header-label">Value</span>
+                    <span class="portfolio-header-label">Gain/Loss</span>
+                </div>
+                <div id="portfolioList" class="portfolio-list">
+                    <p class="empty-portfolio">No positions yet</p>
+                </div>
+            </div>
+
+            <div class="trading-section">
+                <div class="equity-selector-section">
+                    <label for="equitySelect">Select Equity:</label>
+                    <select id="equitySelect" class="equity-select">
+                        <option value="NL Co">NL Co</option>
+                        <option value="Bank of Finance">Bank of Finance</option>
+                        <option value="DCF Industries">DCF Industries</option>
+                        <option value="Walls and Streets Architecture">Walls and Streets Architecture</option>
+                        <option value="AI Tech">AI Tech</option>
+                    </select>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <h3 id="selectedEquityTitle">NL Co Price</h3>
+                        <canvas id="equityChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <h3>Total Equity Value</h3>
+                        <canvas id="cashChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="trading-controls">
+                    <div class="quantity-control">
+                        <label for="quantityInput">Quantity:</label>
+                        <div class="quantity-input-wrapper">
+                            <button class="quantity-btn" id="quantityDown">−</button>
+                            <input type="number" id="quantityInput" value="1" min="1" step="1">
+                            <button class="quantity-btn" id="quantityUp">+</button>
+                        </div>
+                    </div>
+                    <div class="trade-buttons">
+                        <button id="buyButton" class="trade-btn buy-btn">Buy</button>
+                        <button id="sellButton" class="trade-btn sell-btn">Sell</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="gameOverOverlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h2>You ran out of money</h2>
+                <button id="tryAgainButton" class="start-button">Try again</button>
+            </div>
+        </div>
+
+        <!-- Win Overlay -->
+        <div id="winOverlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h2 class="win-title">Congratulations! You Win!</h2>
+                <p class="win-message">You reached $100,000!</p>
+                <button id="playAgainButton" class="start-button">Play Again</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            Created by Nick Lukas
+        </footer>
+    </div>
+
+    <py-script src="app.py"></py-script>
+</body>
+</html>
+
