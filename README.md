@@ -103,10 +103,10 @@ Charts update once per second and reflect all price and trade changes immediatel
 
 ## Project Structure
 
-index.html   // Application layout and structure
-styles.css   // Styling and layout
-app.py       // Simulation and trading logic
-README.md
+- index.html   // Application layout and structure
+- styles.css   // Styling and layout
+- app.py       // Simulation and trading logic
+- README.md
 
 ## License
 
